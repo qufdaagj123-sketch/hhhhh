@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MultiBot — 200+ lệnh</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0a0a0a;--bg2:#111;--border:#2a2a2a;--text:#f5f5f5;--muted:#888;--red:#f87171}
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    .wrap{max-width:800px;margin:0 auto;padding:24px 14px 50px}
+    header{margin-bottom:20px}
+    h1{font-family:'Space Grotesk',sans-serif;font-size:1.4rem}
+    .sub{color:var(--muted);font-size:.88rem;margin-top:4px}
+    .card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:12px}
+    label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:6px}
+    input{width:100%;padding:11px 12px;background:#0a0a0a;border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:.88rem;outline:none;margin-bottom:12px}
+    .btns{display:flex;gap:8px;flex-wrap:wrap}
+    .btn{padding:10px 16px;border-radius:10px;font-weight:650;font-size:.88rem;border:none;cursor:pointer;font-family:inherit}
+    .btn-w{background:#fff;color:#000}.btn-g{background:transparent;border:1px solid var(--border);color:var(--text)}
+    .btn:disabled{opacity:.45;cursor:not-allowed}
+    .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid var(--border);font-size:.75rem;color:var(--muted);margin-bottom:12px}
+    .badge.on{color:#fff;border-color:#555}.dot{width:7px;height:7px;border-radius:50%;background:#555}.badge.on .dot{background:#fff}
+    .bot{display:none;gap:12px;align-items:center;padding:12px;background:#0a0a0a;border-radius:10px;border:1px solid var(--border);margin-bottom:12px}
+    .bot.show{display:flex}.bot img{width:48px;height:48px;border-radius:50%}
+    .logs{background:#0a0a0a;border:1px solid var(--border);border-radius:10px;min-height:180px;max-height:280px;overflow-y:auto;padding:10px;font-family:'JetBrains Mono',monospace;font-size:.74rem}
+    .log{margin-bottom:2px}.log.err{color:var(--red)}.log.ok{color:#ddd}.log.sys{color:#999}
+    .cmds{max-height:220px;overflow-y:auto;font-size:.75rem;color:var(--muted);line-height:1.6}
+    .err{color:var(--red);font-size:.85rem;margin-top:8px;display:none}
+    .note{font-size:.82rem;color:var(--muted);margin-top:10px;line-height:1.45}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>MultiBot Panel</h1>
+      <div class="sub">Dán token bot · Start · 200+ lệnh setup server · Prefix <code>!</code></div>
+    </header>
+
+    <div class="card">
+      <span class="badge" id="badge"><span class="dot"></span> Offline</span>
+      <div class="bot" id="botCard">
+        <img id="av" alt="" />
+        <div>
+          <div id="tag" style="font-weight:600"></div>
+          <div id="meta" style="font-size:.8rem;color:var(--muted)"></div>
+        </div>
+      </div>
+      <label>Bot Token</label>
+      <input type="password" id="token" placeholder="Token bot Discord..." autocomplete="off" />
+      <div class="btns">
+        <button class="btn btn-w" id="start" type="button">▶ Start</button>
+        <button class="btn btn-g" id="stop" type="button" disabled>■ Stop</button>
+      </div>
+      <p class="err" id="err"></p>
+      <p class="note">Bật <b style="color:#fff">Message Content Intent</b> (+ Server Members Intent nếu cần) trên Developer Portal. Mời bot với quyền quản lý phù hợp.</p>
+    </div>
+
+    <div class="card">
+      <div style="font-size:.8rem;color:var(--muted);margin-bottom:8px">Console</div>
+      <div class="logs" id="logs"></div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:.8rem;color:var(--muted);margin-bottom:8px">Lệnh (<span id="cc">…</span>) — gõ <code>!help</code> trên Discord</div>
+      <div class="cmds" id="cmds">Đang tải…</div>
+    </div>
+  </div>
+  <script>
+    const logsEl=document.getElementById('logs');
+    function addLog(e){
+      const d=document.createElement('div');
+      d.className='log '+(e.type||'sys');
+      d.textContent='['+new Date(e.time||Date.now()).toLocaleTimeString('vi-VN')+'] '+e.text;
+      logsEl.appendChild(d); logsEl.scrollTop=99999;
+    }
+    function setStatus(running,bot){
+      const b=document.getElementById('badge');
+      if(running){b.className='badge on';b.innerHTML='<span class="dot"></span> Online';start.disabled=true;stop.disabled=false;}
+      else{b.className='badge';b.innerHTML='<span class="dot"></span> Offline';start.disabled=false;stop.disabled=true;}
+      const card=document.getElementById('botCard');
+      if(bot){card.classList.add('show');av.src=bot.avatar||'';tag.textContent=bot.tag;meta.textContent=bot.guilds+' server · '+bot.commands+' lệnh';}
+      else card.classList.remove('show');
+    }
+    async function refresh(){
+      try{const r=await fetch('/api/status');const d=await r.json();setStatus(d.running,d.bot);if(d.commandCount)cc.textContent=d.commandCount;}catch{}
+    }
+    try{
+      const es=new EventSource('/api/logs/stream');
+      es.onmessage=ev=>{try{addLog(JSON.parse(ev.data));}catch{}refresh();};
+    }catch{}
+    start.onclick=async()=>{
+      err.style.display='none';
+      const token=document.getElementById('token').value.trim();
+      if(!token){err.textContent='Nhập token';err.style.display='block';return;}
+      start.disabled=true;
+      try{
+        const r=await fetch('/api/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
+        const d=await r.json();
+        if(!r.ok)throw new Error(d.error||'Lỗi');
+        setTimeout(refresh,1000);
+      }catch(e){err.textContent=e.message;err.style.display='block';start.disabled=false;}
+    };
+    stop.onclick=async()=>{await fetch('/api/stop',{method:'POST'});setStatus(false,null);};
+    fetch('/api/commands').then(r=>r.json()).then(list=>{
+      cc.textContent=list.length;
+      const cats={};
+      list.forEach(c=>{(cats[c.cat]||=[]).push(c.name);});
+      cmds.innerHTML=Object.entries(cats).map(([k,v])=>'<b style="color:#ccc">'+k+'</b>: '+v.map(n=>'! '+n).join(', ')).join('<br><br>');
+    });
+    refresh(); setInterval(refresh,5000);
+  </script>
+</body>
+</html>
